@@ -30,32 +30,85 @@ router.get("/", async (req, res) => {
 });
 
 // Create a new availability slot
-router.post("/", async (req, res) => {
+router.post("/", authenticateJWT, async (req, res) => {
   try {
-    const { userId, date, startTime, endTime, maxPets, acceptedPetTypes } =
-      req.body;
+    const { date, startTime, endTime, maxPets, acceptedPetTypes } = req.body;
 
-    const newSlot = await prisma.availabilitySlot.create({
+    // Make sure we have the authenticated user
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    console.log("Creating availability slot for user:", req.user.id);
+
+    const availabilitySlot = await prisma.availabilitySlot.create({
       data: {
-        user_id: userId,
+        user_id: req.user.id,
         date: new Date(date),
         start_time: startTime,
         end_time: endTime,
-        max_pets: maxPets || 1,
-        accepted_pet_types: acceptedPetTypes || ["Dog", "Cat", "Bird"],
+        max_pets: parseInt(maxPets) || 1,
+        accepted_pet_types: acceptedPetTypes || [
+          "Dog",
+          "Cat",
+          "Bird",
+          "Fish",
+          "Rabbit",
+          "Hamster",
+          "Guinea Pig",
+          "Reptile",
+          "Other",
+        ],
       },
     });
 
-    res.status(201).json(newSlot);
+    res.status(201).json(availabilitySlot);
   } catch (error) {
-    console.error("Error creating availability slot:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Error adding availability slot:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 // Simple test route
 router.get("/", (req, res) => {
   res.json({ message: "Availability route working" });
+});
+
+// Also update the PUT route for editing existing slots
+router.put("/:id", authenticateJWT, async (req, res) => {
+  try {
+    const slotId = parseInt(req.params.id);
+    const { date, startTime, endTime, maxPets, acceptedPetTypes } = req.body;
+
+    // Check if slot exists and belongs to user
+    const slot = await prisma.availabilitySlot.findUnique({
+      where: { id: slotId },
+    });
+
+    if (!slot) {
+      return res.status(404).json({ message: "Availability slot not found" });
+    }
+
+    if (slot.user_id !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const updatedSlot = await prisma.availabilitySlot.update({
+      where: { id: slotId },
+      data: {
+        date: date ? new Date(date) : undefined,
+        start_time: startTime,
+        end_time: endTime,
+        max_pets: maxPets ? parseInt(maxPets) : undefined,
+        accepted_pet_types: acceptedPetTypes,
+      },
+    });
+
+    res.json(updatedSlot);
+  } catch (error) {
+    console.error("Error updating availability slot:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 module.exports = router;

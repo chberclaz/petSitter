@@ -12,6 +12,7 @@ const availabilityRoutes = require("./routes/availability");
 const certificateRoutes = require("./routes/certificates");
 const experienceRoutes = require("./routes/experiences");
 const adminRoutes = require("./routes/admin");
+const sittingRequestRoutes = require("./routes/sittingRequests");
 
 // Import middleware
 const authMiddleware = require("./middleware/auth");
@@ -42,6 +43,7 @@ app.use(
 app.use("/api/certificates", authMiddleware.authenticateJWT, certificateRoutes);
 app.use("/api/experiences", authMiddleware.authenticateJWT, experienceRoutes);
 app.use("/api/admin", authMiddleware.authenticateJWT, adminRoutes);
+app.use("/api/sitting-requests", sittingRequestRoutes);
 
 // Basic route for testing
 app.get("/", (req, res) => {

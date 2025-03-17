@@ -8,6 +8,12 @@ const prisma = new PrismaClient();
 // Get current user profile
 router.get("/me", async (req, res) => {
   try {
+    // Check if user exists in the request
+    if (!req.user || !req.user.id) {
+      console.log("User not found in request:", req.user);
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       include: {

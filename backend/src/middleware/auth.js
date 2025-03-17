@@ -4,43 +4,54 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 // Authentication middleware
-const authenticateJWT = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
+const authenticateJWT = (req, res, next) => {
+  console.log("[Auth Middleware] Authenticating request to:", req.originalUrl);
+  const authHeader = req.headers.authorization;
+  console.log("[Auth Middleware] Authorization header present:", !!authHeader);
 
-    if (!authHeader) {
-      return res.status(401).json({ message: "Authorization header missing" });
-    }
-
+  if (authHeader) {
     const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your-secret-key"
-    );
+    console.log("[Auth Middleware] Token extracted, verifying...");
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+      if (err) {
+        console.error(
+          "[Auth Middleware] JWT verification failed:",
+          err.message
+        );
+        return res.status(403).json({ message: "Invalid or expired token" });
+      }
+
+      console.log(
+        "[Auth Middleware] JWT verified successfully for user:",
+        user.id
+      );
+      req.user = user;
+      next();
     });
-
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: "Invalid token" });
+  } else {
+    console.log(
+      "[Auth Middleware] No authorization header, authentication required"
+    );
+    res.status(401).json({ message: "Authentication required" });
   }
 };
 
 // Admin middleware
 const isAdmin = (req, res, next) => {
-  if (!req.user || !req.user.is_admin) {
-    return res
-      .status(403)
-      .json({ message: "Access denied: Admin privileges required" });
+  console.log(
+    "[Admin Middleware] Checking admin status for user:",
+    req.user?.id
+  );
+  console.log("[Admin Middleware] User role:", req.user?.role);
+
+  if (req.user && req.user.role === "admin") {
+    console.log("[Admin Middleware] Admin access granted");
+    next();
+  } else {
+    console.log("[Admin Middleware] Admin access denied");
+    res.status(403).json({ message: "Admin access required" });
   }
-  next();
 };
 
 module.exports = { authenticateJWT, isAdmin };
